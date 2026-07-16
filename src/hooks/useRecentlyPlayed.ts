@@ -7,8 +7,10 @@ type State = {
   error: string | null
 }
 
-/** Refresh when now-playing track id changes; otherwise load once. */
-export function useRecentlyPlayed(nowPlayingId?: string | null): State {
+export function useRecentlyPlayed(
+  nowPlayingId?: string | null,
+  limit = 4,
+): State {
   const [items, setItems] = useState<RecentlyPlayedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -18,7 +20,7 @@ export function useRecentlyPlayed(nowPlayingId?: string | null): State {
 
     async function load() {
       try {
-        const next = await fetchRecentlyPlayedList(8)
+        const next = await fetchRecentlyPlayedList(limit)
         if (cancelled) return
         setItems(next)
         setError(null)
@@ -34,7 +36,7 @@ export function useRecentlyPlayed(nowPlayingId?: string | null): State {
     return () => {
       cancelled = true
     }
-  }, [nowPlayingId])
+  }, [nowPlayingId, limit])
 
   return { items, loading, error }
 }

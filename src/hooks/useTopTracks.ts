@@ -7,7 +7,7 @@ type State = {
   error: string | null
 }
 
-export function useTopTracks(): State {
+export function useTopTracks(limit = 4): State {
   const [tracks, setTracks] = useState<TrackSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -17,7 +17,7 @@ export function useTopTracks(): State {
 
     async function load() {
       try {
-        const next = await fetchTopTracks('medium_term', 8)
+        const next = await fetchTopTracks('medium_term', limit)
         if (cancelled) return
         setTracks(next)
         setError(null)
@@ -33,7 +33,7 @@ export function useTopTracks(): State {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [limit])
 
   return { tracks, loading, error }
 }
