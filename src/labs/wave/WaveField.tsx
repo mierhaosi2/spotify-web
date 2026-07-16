@@ -3,6 +3,9 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { cn } from '@/lib/utils'
 
+/** Garden accent — matches plant pink */
+const GARDEN_ROSE = 0xfd6b94
+
 export type WaveFieldProps = {
   /** Lower particle count, no orbit, pointer-events none */
   ambient?: boolean
@@ -24,9 +27,9 @@ export function WaveField({
     const mount = mountRef.current
     if (!mount) return
 
-    const amountX = ambient ? 28 : 50
-    const amountY = ambient ? 28 : 50
-    const separation = 100
+    const amountX = ambient ? 20 : 50
+    const amountY = ambient ? 20 : 50
+    const separation = ambient ? 120 : 100
     const total = amountX * amountY
 
     const positions = new Float32Array(total * 3)
@@ -39,7 +42,7 @@ export function WaveField({
         positions[i] = ix * separation - (amountX * separation) / 2
         positions[i + 1] = 0
         positions[i + 2] = iy * separation - (amountY * separation) / 2
-        scales[p] = ambient ? 6 : 8
+        scales[p] = ambient ? 5 : 8
         intensities[p] = ambient ? 0.35 : 0.6
         i += 3
         p += 1
@@ -47,9 +50,7 @@ export function WaveField({
     }
 
     const scene = new THREE.Scene()
-    scene.background = ambient
-      ? new THREE.Color(0x050505)
-      : new THREE.Color(0x15161a)
+    scene.background = ambient ? null : new THREE.Color(0x15161a)
 
     const camera = new THREE.PerspectiveCamera(
       75,
@@ -57,20 +58,33 @@ export function WaveField({
       0.1,
       10000,
     )
-    camera.position.set(0, ambient ? 480 : 400, ambient ? 1400 : 1200)
+    camera.position.set(0, ambient ? 520 : 400, ambient ? 1500 : 1200)
     camera.lookAt(0, 0, 0)
 
     const renderer = new THREE.WebGLRenderer({
       antialias: !ambient,
-      alpha: ambient,
+      alpha: true,
       powerPreference: ambient ? 'low-power' : 'default',
     })
+    renderer.setClearColor(0x000000, ambient ? 0 : 1)
     renderer.setSize(mount.clientWidth, mount.clientHeight)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, ambient ? 1.5 : 2))
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, ambient ? 1.25 : 2))
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = ambient ? 0.75 : 1
+    renderer.toneMappingExposure = ambient ? 0.65 : 1
+    renderer.domElement.style.cssText =
+      'display:block;width:100%;height:100%;touch-action:none;'
     mount.appendChild(renderer.domElement)
+
+    requestAnimationFrame(() => {
+      const w = mount.clientWidth
+      const h = mount.clientHeight
+      if (w > 0 && h > 0) {
+        renderer.setSize(w, h)
+        camera.aspect = w / h
+        camera.updateProjectionMatrix()
+      }
+    })
 
     let controls: OrbitControls | undefined
     if (!ambient) {
@@ -79,10 +93,19 @@ export function WaveField({
       controls.target.set(0, 0, 0)
     }
 
-    scene.add(new THREE.HemisphereLight(0xb7c8ff, 0x2a2532, ambient ? 0.15 : 0.25))
-    scene.add(new THREE.AmbientLight(0xffffff, ambient ? 0.08 : 0.12))
+    scene.add(
+      new THREE.HemisphereLight(
+        ambient ? 0xffc0d4 : 0xb7c8ff,
+        0x2a2532,
+        ambient ? 0.12 : 0.25,
+      ),
+    )
+    scene.add(new THREE.AmbientLight(0xffffff, ambient ? 0.06 : 0.12))
 
-    const sun = new THREE.DirectionalLight(0xfff2de, ambient ? 0.9 : 1.6)
+    const sun = new THREE.DirectionalLight(
+      ambient ? 0xffe0ea : 0xfff2de,
+      ambient ? 0.55 : 1.6,
+    )
     sun.position.set(8, 12, 7)
     scene.add(sun)
 
@@ -96,8 +119,10 @@ export function WaveField({
 
     const material = new THREE.ShaderMaterial({
       uniforms: {
-        uBaseColor: { value: new THREE.Color(ambient ? 0x4a8aad : 0x66ccff) },
-        uOpacity: { value: ambient ? 0.55 : 1 },
+        uBaseColor: {
+          value: new THREE.Color(ambient ? GARDEN_ROSE : 0x66ccff),
+        },
+        uOpacity: { value: ambient ? 0.42 : 1 },
       },
       vertexShader: `
         attribute float scale;
@@ -119,13 +144,14 @@ export function WaveField({
           float r2 = dot(c, c);
           if (r2 > 1.0) discard;
           vec3 color = uBaseColor * vIntensity;
-          float alpha = (1.0 - r2) * (0.35 + vIntensity * 0.65) * uOpacity;
+          float alpha = (1.0 - r2) * (0.25 + vIntensity * 0.55) * uOpacity;
           gl_FragColor = vec4(color, alpha);
         }
       `,
       transparent: true,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      // Normal blending — additive cyan was punching through the music column
+      blending: ambient ? THREE.NormalBlending : THREE.AdditiveBlending,
     })
 
     const points = new THREE.Points(geometry, material)
@@ -143,7 +169,7 @@ export function WaveField({
       const ints = geometry.attributes.intensity.array as Float32Array
       let ptr = 0
       let idx = 0
-      const amp = ambient ? 0.55 : 1
+      const amp = ambient ? 0.4 : 1
       for (let ix = 0; ix < amountX; ix++) {
         for (let iy = 0; iy < amountY; iy++) {
           const phase = Math.sin(ix * 12.9898 + iy * 78.233) * 43758.5453
@@ -155,10 +181,14 @@ export function WaveField({
             amp
           pos[ptr + 1] = wave
           const t = THREE.MathUtils.clamp((wave + 140) / 280, 0, 1)
-          scl[idx] = THREE.MathUtils.lerp(ambient ? 18 : 28, ambient ? 28 : 42, t)
+          scl[idx] = THREE.MathUtils.lerp(
+            ambient ? 12 : 28,
+            ambient ? 22 : 42,
+            t,
+          )
           ints[idx] = THREE.MathUtils.lerp(
-            ambient ? 0.4 : 0.65,
-            ambient ? 1.1 : 1.85,
+            ambient ? 0.3 : 0.65,
+            ambient ? 0.75 : 1.85,
             t,
           )
           ptr += 3
@@ -168,7 +198,7 @@ export function WaveField({
       geometry.attributes.position.needsUpdate = true
       geometry.attributes.scale.needsUpdate = true
       geometry.attributes.intensity.needsUpdate = true
-      waveCount += ambient ? 0.12 : 0.2
+      waveCount += ambient ? 0.07 : 0.2
       controls?.update()
       renderer.render(scene, camera)
     }
@@ -199,7 +229,11 @@ export function WaveField({
   return (
     <div
       ref={mountRef}
-      className={cn('h-full w-full', ambient && 'pointer-events-none', className)}
+      className={cn(
+        'absolute inset-0 h-full w-full overflow-hidden',
+        ambient && 'pointer-events-none',
+        className,
+      )}
     />
   )
 }

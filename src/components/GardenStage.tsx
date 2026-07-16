@@ -1,30 +1,25 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { AmbientWave } from '@/components/AmbientWave'
+import type { ClearZone } from '@/components/clearZone'
 import { GardenCanvas } from '@/labs/garden/GardenCanvas.jsx'
 import { cn } from '@/lib/utils'
 
-export type ClearZone = {
-  left: number
-  right: number
-  bottom: number
-  top: number
-}
+export type { ClearZone }
 
 type GardenStageProps = {
-  onActiveChange?: (active: boolean) => void
   overlay: ReactNode
 }
 
-const PAD = 2
+const PAD = 4
 
-export function GardenStage({ onActiveChange, overlay }: GardenStageProps) {
+/**
+ * Layers: pixel rain (sides) → garden plants → scrolling music column.
+ * Rain + plants share the same clear lane under the music column.
+ */
+export function GardenStage({ overlay }: GardenStageProps) {
   const stageRef = useRef<HTMLDivElement>(null)
   const musicRef = useRef<HTMLDivElement>(null)
   const [clearZone, setClearZone] = useState<ClearZone | null>(null)
-
-  useEffect(() => {
-    onActiveChange?.(true)
-    return () => onActiveChange?.(false)
-  }, [onActiveChange])
 
   useLayoutEffect(() => {
     const stage = stageRef.current
@@ -38,14 +33,12 @@ export function GardenStage({ onActiveChange, overlay }: GardenStageProps) {
 
       const left = ((m.left - g.left) / g.width) * 100 - PAD
       const right = ((m.right - g.left) / g.width) * 100 + PAD
-      const bottom = ((g.bottom - m.bottom) / g.height) * 100 - PAD
-      const top = ((g.bottom - m.top) / g.height) * 100 + PAD
 
       setClearZone({
         left: Math.max(0, left),
         right: Math.min(100, right),
-        bottom: Math.max(0, bottom),
-        top: Math.min(100, top),
+        bottom: 0,
+        top: 100,
       })
     }
 
@@ -61,30 +54,61 @@ export function GardenStage({ onActiveChange, overlay }: GardenStageProps) {
   }, [])
 
   return (
-    <section
-      id="garden"
-      className="relative z-0 h-[100svh] w-full overflow-hidden"
-    >
-      <div ref={stageRef} className="relative h-full w-full overflow-hidden">
-        <GardenCanvas clearZone={clearZone} plantCount={34} />
+    <>
+      <div
+        ref={stageRef}
+        className="pointer-events-none fixed inset-0 z-[1]"
+        aria-hidden={false}
+      >
+        <AmbientWave clearZone={clearZone} />
+        <div className="pointer-events-auto relative z-[1] h-full w-full">
+          <GardenCanvas clearZone={clearZone} plantCount={34} />
+        </div>
+      </div>
 
-        {/* items-start: column wraps content only — fixes the giant empty stretch */}
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center overflow-hidden">
+      <div className="pointer-events-none relative z-10 flex min-h-[100svh] justify-center">
+        <div
+          ref={musicRef}
+          className="pointer-events-auto relative w-full max-w-2xl"
+        >
+          {/*
+            Visible lane edge (black-on-black was invisible):
+            slightly lifted center + soft rose rims that feather into the garden.
+          */}
           <div
-            ref={musicRef}
+            aria-hidden
             className={cn(
-              'pointer-events-auto flex w-full max-w-xl flex-col gap-4',
-              'max-h-[100svh] overflow-y-auto overscroll-contain',
-              'px-5 py-5 sm:px-6 sm:py-6',
+              'pointer-events-none absolute inset-y-0 -left-28 -right-28 sm:-left-36 sm:-right-36',
+              'supports-[backdrop-filter]:backdrop-blur-[3px]',
+            )}
+            style={{
+              background:
+                // Soft lifted lane — wider feather into the garden
+                'linear-gradient(to right,' +
+                'transparent 0%,' +
+                'rgba(255,255,255,0.02) 8%,' +
+                'rgba(16,16,22,0.35) 16%,' +
+                'rgba(16,16,22,0.7) 26%,' +
+                'rgba(16,16,22,0.9) 36%,' +
+                'rgba(16,16,22,0.9) 64%,' +
+                'rgba(16,16,22,0.7) 74%,' +
+                'rgba(16,16,22,0.35) 84%,' +
+                'rgba(255,255,255,0.02) 92%,' +
+                'transparent 100%)',
+            }}
+          />
+
+          <div
+            className={cn(
+              'relative z-10 flex min-h-[100svh] w-full flex-col',
+              'px-6 pt-10 pb-4 sm:px-8 sm:pt-12 sm:pb-5',
               'font-mono text-[12px] font-bold leading-snug tracking-tight',
-              'bg-gradient-to-b from-[#090910]/60 via-[#090910]/40 to-[#090910]/60',
-              'supports-[backdrop-filter]:backdrop-blur-[1.5px]',
             )}
           >
             {overlay}
           </div>
         </div>
       </div>
-    </section>
+    </>
   )
 }

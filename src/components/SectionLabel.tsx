@@ -10,8 +10,7 @@ export function SectionLabel({ children, className }: SectionLabelProps) {
   return (
     <h2
       className={cn(
-        'text-[11px] font-bold tracking-wide',
-        'text-[rgba(253,107,148,0.55)]',
+        'text-[13px] font-bold tracking-wide text-muted-foreground',
         className,
       )}
     >

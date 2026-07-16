@@ -6,27 +6,34 @@ import type { LastListenedTrack } from '@/lib/api'
 import { formatPlayedAt } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-const LIGHT_LENS: Partial<GlassOptics> = {
-  mapSize: 128,
+/** Same family of optics as the Liquid Glass lab notification */
+const PANEL_LENS: Partial<GlassOptics> = {
+  mapSize: 256,
   clipToShape: true,
   softEdge: true,
-  depth: 0.85,
-  curvature: 0.45,
-  dispersion: 0.25,
-  strength: 0.14,
-  bend: 0.5,
-  frost: 2.2,
-  brightness: 0.12,
-  specular: 1.1,
-  glow: 0.2,
-  sheen: 0.9,
+  depth: 1,
+  curvature: 0.5,
+  dispersion: 0.55,
+  strength: 0.17,
+  bend: 0.7,
+  bendWidth: 0.12,
+  frost: 3,
+  brightness: 0.22,
+  specular: 1.3,
+  sheenAngle: 50,
+  glow: 0.32,
+  glowSpread: 1,
+  glowFalloff: 1,
+  sheen: 1.3,
+  sheenWidth: 3,
 }
 
+/** Garden-adjacent rose field — refraction readable without neon clash */
 const WALLPAPER =
-  'radial-gradient(120% 120% at 10% 20%, rgba(102,204,255,0.45) 0%, transparent 50%),' +
-  'radial-gradient(120% 120% at 90% 30%, rgba(192,132,252,0.35) 0%, transparent 48%),' +
-  'radial-gradient(130% 130% at 50% 100%, rgba(253,107,148,0.28) 0%, transparent 55%),' +
-  'linear-gradient(160deg, #12121a, #0a0a10)'
+  'radial-gradient(120% 120% at 14% 20%, rgba(253,107,148,0.55) 0%, transparent 48%),' +
+  'radial-gradient(120% 120% at 86% 18%, rgba(192,132,252,0.35) 0%, transparent 46%),' +
+  'radial-gradient(130% 130% at 70% 90%, rgba(253,107,148,0.4) 0%, transparent 52%),' +
+  'linear-gradient(160deg, #1a1018, #0a0a10 55%, #141018)'
 
 type LastListenedState = {
   track: LastListenedTrack | null
@@ -45,10 +52,11 @@ function useSize() {
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
-    const ro = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect
-      setSize({ w: Math.round(width), h: Math.round(height) })
-    })
+    const measure = () => {
+      setSize({ w: Math.round(el.clientWidth), h: Math.round(el.clientHeight) })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
@@ -63,15 +71,15 @@ export function GlassNowPlaying({ state }: GlassNowPlayingProps) {
   const ready = w > 0 && h > 0
 
   return (
-    <section className="mt-1 flex w-full flex-col items-center gap-2">
-      <p className="text-[11px] font-bold text-[rgba(253,107,148,0.55)]">
+    <section className="flex w-full flex-col items-center gap-3">
+      <p className="text-[11px] font-bold text-[rgba(253,107,148,0.78)]">
         // last listened to...
       </p>
 
       <div
         ref={panelRef}
-        className="relative w-full max-w-md overflow-hidden rounded-xl"
-        style={{ minHeight: 64 }}
+        className="relative w-full max-w-md overflow-hidden rounded-2xl"
+        style={{ minHeight: 72 }}
       >
         <div
           className="pointer-events-none absolute inset-0"
@@ -82,10 +90,12 @@ export function GlassNowPlaying({ state }: GlassNowPlayingProps) {
         {ready && (
           <Glass
             refract={
-              <div style={{ position: 'absolute', inset: 0, background: WALLPAPER }} />
+              <div
+                style={{ position: 'absolute', inset: 0, background: WALLPAPER }}
+              />
             }
-            behind="#0a0a10"
-            optics={LIGHT_LENS}
+            behind="#2a1520"
+            optics={PANEL_LENS}
             style={{
               position: 'absolute',
               inset: 0,
@@ -96,26 +106,28 @@ export function GlassNowPlaying({ state }: GlassNowPlayingProps) {
           />
         )}
 
-        <div className="relative z-10 px-4 py-3">
+        <div
+          className={cn(
+            'relative z-10 flex items-center px-4 py-3.5',
+            'shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.45)]',
+          )}
+        >
           {loading && !track ? (
-            <div className="flex items-center gap-3" aria-hidden>
-              <div className="size-12 shrink-0 animate-pulse rounded-md bg-white/10" />
+            <div className="flex w-full items-center gap-3" aria-hidden>
+              <div className="size-12 shrink-0 animate-pulse rounded-md bg-white/15" />
               <div className="flex min-w-0 flex-1 flex-col gap-2">
-                <div className="h-4 w-2/3 animate-pulse rounded bg-white/10" />
-                <div className="h-3 w-1/3 animate-pulse rounded bg-white/10" />
+                <div className="h-4 w-2/3 animate-pulse rounded bg-white/15" />
+                <div className="h-3 w-1/3 animate-pulse rounded bg-white/15" />
               </div>
             </div>
           ) : error && !track ? (
-            <p className="text-[11px] text-muted-foreground">Unable to load</p>
+            <p className="text-[11px] text-white/70">Unable to load</p>
           ) : track ? (
             <a
               href={track.spotifyUrl}
               target="_blank"
               rel="noreferrer"
-              className={cn(
-                'group flex items-center gap-3',
-                'transition-opacity hover:opacity-90',
-              )}
+              className="group flex w-full items-center gap-3 transition-opacity hover:opacity-90"
             >
               {track.albumArtUrl ? (
                 <img
@@ -124,28 +136,28 @@ export function GlassNowPlaying({ state }: GlassNowPlayingProps) {
                   className="size-11 shrink-0 rounded-sm object-cover"
                 />
               ) : (
-                <div className="size-11 shrink-0 rounded-sm bg-white/10" />
+                <div className="size-11 shrink-0 rounded-sm bg-white/15" />
               )}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[12px] font-bold tracking-wide text-white uppercase">
                   {track.name}
                 </p>
-                <p className="truncate text-[11px] text-white/65">{track.artists}</p>
+                <p className="truncate text-[11px] text-white/70">{track.artists}</p>
               </div>
-              <SpotifyIcon className="size-4 shrink-0 text-white/55 transition-colors group-hover:text-white" />
+              <SpotifyIcon className="size-4 shrink-0 text-white/60 transition-colors group-hover:text-white" />
             </a>
           ) : (
-            <p className="text-[11px] text-white/60">Nothing played yet</p>
+            <p className="text-[11px] text-white/65">Nothing played yet</p>
           )}
         </div>
       </div>
 
-      <div className="flex w-full max-w-md items-center justify-between gap-4 text-[11px] text-[rgba(253,107,148,0.45)]">
+      <div className="flex w-full max-w-md items-center justify-between gap-4 text-[11px] text-[rgba(253,107,148,0.72)]">
         <span>{timeLabel}</span>
         <span>{siteConfig.location}</span>
         <a
           href={`mailto:${siteConfig.email}`}
-          className="transition-colors hover:text-[rgba(253,107,148,0.85)]"
+          className="transition-colors hover:text-[rgba(253,107,148,0.95)]"
         >
           Email →
         </a>
